@@ -48,9 +48,10 @@ namespace Leeclerk_Scrapper
         static void Main(string[] args)
         {
             clear_Resort_Array(true, 0);
-            string startdate = "2/2/2018";
-            string enddate = "3/2/2018";
-            string recdate = DateTime.Now.ToString("M/d/yyy"); //"3/2/2018";//today's date
+            var startdate = ConfigUtils.GetAppSettingValue<string>(AppSettings.SearchStartDate);//"2/2/2018";
+            var enddate = ConfigUtils.GetAppSettingValue<string>(AppSettings.SearchEndDate); //"3/2/2018";
+            var documentTypes = ConfigUtils.GetAppSettingValue<string>(AppSettings.DocumentTypes); //"AD, ADC"
+            var recdate = DateTime.Now.ToString("M/d/yyy"); //"3/2/2018";//today's date
 
             string baseurl = "https://or.leeclerk.org/OR/Search.aspx";
             // Setup browserless client with cookies capability
@@ -82,7 +83,7 @@ namespace Leeclerk_Scrapper
                 request.AddQueryParameter("bt", "O");
                 request.AddQueryParameter("d", recdate);
                 request.AddQueryParameter("pt", "-1");
-                request.AddQueryParameter("dt", "AD, ADC");
+                request.AddQueryParameter("dt", documentTypes);
                 request.AddQueryParameter("vbt", "D");
                 request.AddQueryParameter("st", "documenttype");
 
@@ -126,7 +127,7 @@ namespace Leeclerk_Scrapper
                 data.Add("txtLegalDesc", "");
                 data.Add("ddCaseNumberChoice", "0");
                 data.Add("txtCaseNumber", "");
-                data.Add("txtDocTypes", "AD, ADC");
+                data.Add("txtDocTypes", documentTypes);
                 data.Add("cboCategories", "n/a");
                 data.Add("txtRecordDate", recdate);
                 data.Add("txtBeginDate", startdate);
@@ -171,8 +172,8 @@ namespace Leeclerk_Scrapper
             // Step3: Fetch Details of all records
             Console.WriteLine("Step3: Fetching Records Details...");
 
-            //Parallel.For(0, records_ids.Count, i =>
-            for (var i = 0; i < records_ids.Count; i++)
+            Parallel.For(0, records_ids.Count, i =>
+            //for (var i = 0; i < records_ids.Count; i++)
             {
                 Console.WriteLine($"\t{(i + 1).ToString()}/{records_ids.Count.ToString()}: {records_ids[i]}");
                 var clientForDetails = GetRestClient(baseurl);
@@ -200,15 +201,16 @@ namespace Leeclerk_Scrapper
                 Console.WriteLine("\tDeed: " + deed);
                 Console.WriteLine("\tLegal: " + legal);
                 Console.WriteLine();
-            //});
-}
+            });
+            //}
+
             /*
             ///////////////////////////////////////
             // Put your own local hardrive path here to save the output
             ////////////////////////////////////////*/
 
             string check = Resort_Array[0].efname1;
-            string csvpath = @"G:\";//@"C:\Users\jeff\Dropbox\BIZ\CSV\Timeshares\HorryTimeShares\";
+            string csvpath = ConfigUtils.GetAppSettingValue<string>(AppSettings.OutputFilePath); //@"G:\";//@"C:\Users\jeff\Dropbox\BIZ\CSV\Timeshares\HorryTimeShares\";
             dumptocsv(csvpath, "leeclerk", "", startdate, enddate);
 
             Console.WriteLine("Done! Press Enter to Exit!");
