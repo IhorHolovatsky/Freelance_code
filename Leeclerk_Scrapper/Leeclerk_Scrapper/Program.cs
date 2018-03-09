@@ -5,14 +5,20 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
+using System.Windows.Forms;
 using HtmlAgilityPack;
 using RestSharp;
+using HtmlDocument = HtmlAgilityPack.HtmlDocument;
 
 namespace Leeclerk_Scrapper
 {
     class Program
     {
+        public static CookieContainer Cookies { get; set; }
+
         public static struct_Resort_Array[] Resort_Array = new struct_Resort_Array[10000];
         public struct struct_Resort_Array
         {
@@ -47,6 +53,14 @@ namespace Leeclerk_Scrapper
 
         static void Main(string[] args)
         {
+
+            Console.WriteLine("Step0: Bypassing https://www.incapsula.com/ protection");
+            Task.WaitAll(StartSTATask(() =>
+            {
+                Start();
+                return true;
+            }));
+
             clear_Resort_Array(true, 0);
             var startdate = ConfigUtils.GetAppSettingValue<string>(AppSettings.SearchStartDate);//"2/2/2018";
             var enddate = ConfigUtils.GetAppSettingValue<string>(AppSettings.SearchEndDate); //"3/2/2018";
@@ -61,16 +75,21 @@ namespace Leeclerk_Scrapper
             //start here : https://or.leeclerk.org/OR/Search.aspx
             Console.WriteLine("Step1: Open https://or.leeclerk.org/OR/Search.aspx");
             string url = "https://or.leeclerk.org/OR/Search.aspx";
+           
             var request = new RestRequest(url, Method.GET);
-            IRestResponse response = client.Execute(request);
+            var response = client.Execute(request);
+            
+            //StartSTATask(() =>
+            //{
 
+            //});
 
-            // Step2: Perform Search
+            // Step3: Perform Search
             Console.WriteLine("Step2: Performing Search...");
-            HtmlDocument htmldoc = new HtmlDocument();
+            var htmldoc = new HtmlDocument();
             htmldoc.LoadHtml(response.Content);
             int page_count = 0;
-            List<string> records_ids = new List<string>();
+            var records_details_links = new List<string>();
             while (true)
             {
                 page_count++;
@@ -161,8 +180,9 @@ namespace Leeclerk_Scrapper
                     if ((i <= 2) || (i == trNodes.Count))
                         continue;
                     string recordid = tr.SelectNodes(".//a").First().Attributes["href"].Value;
-                    recordid = Regex.Match(recordid, "id=(\\d+)").Groups[1].Value;
-                    records_ids.Add(recordid);
+                    recordid = recordid.Split('?')[1];
+                    //recordid = Regex.Match(recordid, "id=(\\d+)").Groups[1].Value;
+                    records_details_links.Add(HttpUtility.HtmlDecode(recordid));
                 }
 
                 if (htmldoc.DocumentNode.SelectNodes("//tr[@class='stdFontPager'][1]//span/following-sibling::a") == null)
@@ -172,13 +192,13 @@ namespace Leeclerk_Scrapper
             // Step3: Fetch Details of all records
             Console.WriteLine("Step3: Fetching Records Details...");
 
-            Parallel.For(0, records_ids.Count, i =>
+            Parallel.For(0, records_details_links.Count, i =>
             //for (var i = 0; i < records_ids.Count; i++)
             {
-                Console.WriteLine($"\t{(i + 1).ToString()}/{records_ids.Count.ToString()}: {records_ids[i]}");
+                Console.WriteLine($"\t{(i + 1).ToString()}/{records_details_links.Count.ToString()}: {records_details_links[i]}");
                 var clientForDetails = GetRestClient(baseurl);
-
-                var detailsUrl = "https://or.leeclerk.org/OR/details.aspx?id=" + records_ids[i];
+                //HttpUtility.UrlEncode()
+                var detailsUrl = $"https://or.leeclerk.org/OR/details.aspx?{records_details_links[i]}";
                 var detailsRequest = new RestRequest(detailsUrl, Method.GET);
                 var detailsResponse = clientForDetails.Execute(detailsRequest);
                 var detailsHtmldoc = new HtmlDocument();
@@ -193,7 +213,7 @@ namespace Leeclerk_Scrapper
                 getset_grantee(i, grantee);
                 getset_deed(i, deed);
                 getset_legal(i, legal);
-                Resort_Array[i].detailsId = records_ids[i];
+                Resort_Array[i].detailsId = records_details_links[i];
 
 
                 Console.WriteLine("\tGrantor: " + grantor);
@@ -216,6 +236,34 @@ namespace Leeclerk_Scrapper
             Console.WriteLine("Done! Press Enter to Exit!");
             Console.ReadLine();
         }
+
+        private static void Start()
+        {
+            var webBrowser = new HtmlWeb {UseCookies = true};
+
+            webBrowser.LoadFromBrowser("https://or.leeclerk.org/OR/Search.aspx", delegate(object o)
+            {
+                var browser = (WebBrowser) o;
+
+                var cookies = browser.Document.Cookie;
+
+                Cookies = new CookieContainer();
+                cookies.Split(new[] {";"}, StringSplitOptions.None)
+                                        .Select(c =>
+                                                {
+                                                    var index = c.IndexOf("=", StringComparison.Ordinal);
+                                                    return new KeyValuePair<string, string>(c.Substring(0, index), c.Substring(index + 1, c.Length - index - 1));
+                                                })
+                                        .ToList()
+                                        .ForEach(c =>
+                    {
+                        Cookies.Add(new Cookie(c.Key.Trim(), c.Value, "/", ".leeclerk.org"));
+                    });
+                return true;
+            });
+            
+        }
+
         public static void dumptocsv(string csvpath, string county, string lookingfor, string startdate, string enddate)
         {
             //string county = "Orlando";
@@ -402,13 +450,31 @@ namespace Leeclerk_Scrapper
         {
             var client = new RestClient();
             client.BaseUrl = new Uri(baseurl);
-            client.CookieContainer = new System.Net.CookieContainer();
-            client.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36";
+            client.CookieContainer = Cookies;
 
-            client.CookieContainer.Add(new Uri("https://or.leeclerk.org"), new Cookie("incap_ses_536_882031", "1W5ldoAFKwXgMl4elEFwB3yRmVoAAAAAVSYRXG4q9VIii6l50xcG1A=="));
-            client.CookieContainer.Add(new Uri("https://or.leeclerk.org"), new Cookie("visid_incap_882031", "c1Bss8zRR8qxgHzRvwRkUXyRmVoAAAAAQUIPAAAAAADev/DkkZNi926Q48X0zIva=="));
+            client.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36";
 
+           
             return client;
+        }
+
+        public static Task<T> StartSTATask<T>(Func<T> func)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            Thread thread = new Thread(() =>
+            {
+                try
+                {
+                    tcs.SetResult(func());
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return tcs.Task;
         }
     }
 }
