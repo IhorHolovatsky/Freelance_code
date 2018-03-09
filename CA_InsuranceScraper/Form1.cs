@@ -253,12 +253,10 @@ namespace WebInsurance_Scraper
                 //name + license row
                 if (row.SelectNodes(".//td").Any(tdNode => tdNode.InnerText.Contains("Name: ")))
                 {
-                    var fullName = row.SelectNodes(".//td")?[1]?.FirstChild?.InnerText.Replace("Name: ", string.Empty);
-                    var regex = new Regex("[ ]{2,}", RegexOptions.None);
-                    fullName = regex.Replace(fullName, " ");
-
-                    license.FirstName = fullName.Split(' ').Count() > 1 ? fullName.Split(' ')[0] : fullName;
-                    license.LastName = fullName.Split(' ').Count() > 1 ? fullName.Split(' ')[1] : string.Empty;
+                    var fullName = row.SelectNodes(".//td")?[1]?.FirstChild?.InnerText.Replace("Name: ", string.Empty).Replace("\t", " ");
+                   
+                    license.LastName = fullName.Split(' ').Count() > 1 ? fullName.Split(' ')[0] : fullName;
+                    license.FirstName = fullName.Split(' ').Count() > 1 ? fullName.Split(' ')[1] : string.Empty;
                     license.MiddleName = fullName.Split(' ').Count() > 2 ? fullName.Split(' ')[2] : string.Empty;
 
                     license.LicenseNumber = row.SelectNodes(".//td")?[3]?.InnerText.Replace("License#: ", string.Empty);
@@ -308,7 +306,7 @@ namespace WebInsurance_Scraper
             }
 
             LogMessage($"\n\t License: {license.LicenseNumber}" +
-                       $"\n\t Name: {license.Name}" +
+                       $"\n\t Name: {license.FullName}" +
                        $"\n\t License Types: {string.Join(";",license.Licences.Select(l => $"{l.LicenseType}|{l.ExpirationDate}"))}" +
                        $"\n\t Address: {license.BusinessAddress}" +
                        $"\n\t Phone: {license.BusinessPhone}" +
@@ -342,7 +340,7 @@ namespace WebInsurance_Scraper
 
             using (var stream = File.CreateText(fullPath))
             {
-                const string columnsLine = "name,licenseNumber,licenseTypes,address,phone,companyNames";
+                const string columnsLine = "first_name,last_name,middle_name,licenseNumber,licenseTypes,address,phone,companyNames";
                 stream.WriteLine(columnsLine);
 
                 foreach (var l in personLicenses)
@@ -350,7 +348,7 @@ namespace WebInsurance_Scraper
                     var licenseTypes = string.Join(";", l.Licences.Select(lt => $"{lt.LicenseType}|{lt.ExpirationDate}"));
                     var companyNames = string.Join(";", l.CompanyNames);
 
-                    stream.WriteLine($"{l.Name},{l.LicenseNumber},{licenseTypes},{l.BusinessAddress},{l.BusinessPhone},{companyNames}");
+                    stream.WriteLine($"{l.FirstName},{l.LastName},{l.MiddleName},{l.LicenseNumber},{licenseTypes},{l.BusinessAddress},{l.BusinessPhone},{companyNames}");
                 }
             }
         }

@@ -4,6 +4,11 @@ namespace WebInsurance_Scraper
 {
     public class PersonLicense
     {
+        public string FullName
+        {
+            get { return $"{FirstName} {LastName} {MiddleName}"; }
+        }
+
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string MiddleName { get; set; }
