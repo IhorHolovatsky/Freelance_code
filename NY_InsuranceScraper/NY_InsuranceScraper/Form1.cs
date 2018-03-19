@@ -25,6 +25,8 @@ namespace NY_InsuranceScraper
         public bool IsCaptchaPosted { get; set; }
         public string AuthId { get; set; }
         public int PageNumber = 1;
+        public int TotalPages = 0;
+        public List<PersonLicense> Licenses { get; set; } = new List<PersonLicense>();
 
         private const string BASE_URL = "https://myportal.dfs.ny.gov";
         private const string HOME_URL = "/nylinxext/elsearch.alis";
@@ -47,7 +49,6 @@ namespace NY_InsuranceScraper
             {
                 return;
             }
-            lb_logs.Clear();
 
             var lastName = tbLastName.Text;
 
@@ -60,6 +61,7 @@ namespace NY_InsuranceScraper
                     try
                     {
                         licenseAndDetailUrls = FindActiveLicences(lastName);
+                        Licenses.AddRange(licenseAndDetailUrls);
                     }
                     catch (IndexOutOfRangeException ee)
                     {
@@ -67,17 +69,33 @@ namespace NY_InsuranceScraper
                         return;
                     }
 
+
+                    lbRecordsFound.InvokeEx(l => l.Text = Licenses.Count.ToString());
+                    if (PageNumber < TotalPages)
+                    {
+                        lbFromPage.InvokeEx(l => l.Text = PageNumber.ToString());
+                        lbTotalPages.InvokeEx(l => l.Text = TotalPages.ToString());
+                        Cookies = new CookieContainer();
+                        ShowCaptcha();
+                        IsCaptchaPosted = false;
+                        return;
+                    }
+                    else
+                    {
+                        lbFromPage.InvokeEx(l => l.Text = TotalPages.ToString());}
+
+
                     //STEP 2: Fetch details
                     LogMessage("\n");
                     LogMessage("\n Fetch license details: ");
 
-                    FetchLicenseDetails(lastName, licenseAndDetailUrls);
+                    FetchLicenseDetails(lastName, Licenses);
 
                     //STEP 3: Save to file
                     LogMessage("\n");
                     LogMessage($"\n Save to file - {lb_filePath.Text}");
 
-                    var filteredRows = licenseAndDetailUrls.Where(l => l.Licenses.Any(ll => ll.Status.Equals("Active", StringComparison.CurrentCultureIgnoreCase)))
+                    var filteredRows = Licenses.Where(l => l.Licenses.Any(ll => ll.Status.Equals("Active", StringComparison.CurrentCultureIgnoreCase)))
                                                            .ToList();
                     SaveToCsv(lb_filePath.Text, lastName, filteredRows);
 
@@ -159,14 +177,25 @@ namespace NY_InsuranceScraper
             var licenseDetailLinks = new List<PersonLicense>();
 
             //PERFORM SEARCH:
-            var results = DoSearch(lastName).DocumentNode;
+            var results = DoSearch(lastName,PageNumber).DocumentNode;
 
             var pageCountNodes = results.SelectNodes("//a[@id='viewpage']");
 
             if (pageCountNodes == null)
             {
-                throw new IndexOutOfRangeException("No results found!");
+                throw new IndexOutOfRangeException("No results found! Or something went wrong on server... click 'Search' again please");
             }
+
+            if (TotalPages == 0)
+            {
+                var totalRecords = results.SelectSingleNode("//input[@id='totalRecords']")?.Attributes["value"].Value;
+                TotalPages = int.Parse(totalRecords) / 10;
+                if (int.Parse(totalRecords) % 10 != 0)
+                {
+                    TotalPages++;
+                }
+            }
+
 
             while (true)
             {
@@ -177,20 +206,19 @@ namespace NY_InsuranceScraper
                 //if something strange .. just skip
                 if (rows == null)
                 {
-                    //Cookies = new CookieContainer();
-                    //ShowCaptcha();
                     return licenseDetailLinks;
                 }
 
                 var paramRegex = new Regex("beforeFetchLicenseeDetails\\((.+)\\)");
 
-                var licenses = rows.Select(node => node.Attributes["onclick"].Value)
-                                   .Select(s => paramRegex.Match(s).Groups?[1].Value)
-                                   .Where(s => !string.IsNullOrEmpty(s))
+                var licenses = rows.Select(node => new KeyValuePair<string,string>(node.InnerText.CleanupString(),node.Attributes["onclick"].Value))
+                                   .Select(s => new KeyValuePair<string, string>(s.Key, paramRegex.Match(s.Value).Groups?[1].Value))
+                                   .Where(s => !string.IsNullOrEmpty(s.Value))
                                    .Select(s => new PersonLicense
                                    {
-                                       LicenseId = s.Split(',')[0].Replace("'", string.Empty),
-                                       HashedLicenseId = s.Split(',')[3].Replace("'", string.Empty)
+                                       Name = s.Key,
+                                       LicenseId = s.Value.Split(',')[0].Replace("'", string.Empty),
+                                       HashedLicenseId = s.Value.Split(',')[3].Replace("'", string.Empty)
                                    })
                                    .ToList();
 
@@ -214,7 +242,7 @@ namespace NY_InsuranceScraper
             var progress = 1;
 
             //Parallel.ForEach(licenseDetailUrls, licenseDetailsUrl =>
-            foreach (var licenseDetailsUrl in licenseDetailUrls)
+            foreach (var licenseDetailsUrl in licenseDetailUrls.Where(l => string.IsNullOrEmpty(l.LicenseNo)).ToList())
             {
                 var response = DoSearch(lastName, license: licenseDetailsUrl);
                 
@@ -303,7 +331,7 @@ namespace NY_InsuranceScraper
         {
             var root = doc.DocumentNode;
 
-            license.Name = root.SelectSingleNode("//table[@width='92%']//tr[2]//td[1]")?.InnerText.CleanupString();
+            //license.Name = root.SelectSingleNode("//table[@width='92%']//tr[2]//td[1]")?.InnerText.CleanupString();
             license.BusinessType = root.SelectSingleNode("//table[@width='92%']//tr[2]//td[2]")?.InnerText.CleanupString();
             license.LicenseNo = root.SelectSingleNode("//table[@width='92%']//tr[2]//td[3]")?.InnerText.CleanupString();
             license.Email = root.SelectSingleNode("//table[@width='92%']//tr[2]//td[4]")?.InnerText.CleanupString();
@@ -402,7 +430,7 @@ namespace NY_InsuranceScraper
 
         private void SaveToCsv(string filePath, string lastName, List<PersonLicense> personLicenses)
         {
-            var fullPath = filePath + $"\\NY_Insurance_{lastName}.csv".Replace("/", " ");
+            var fullPath = filePath + $"\\NY_Insurance_{lastName}_{1}-{PageNumber}.csv".Replace("/", " ");
 
             using (var stream = File.CreateText(fullPath))
             {
@@ -478,6 +506,35 @@ namespace NY_InsuranceScraper
                 var json = JObject.Parse(response.Content);
                 AuthId = json["aithentId"].Value<string>();
             }
+        }
+
+        private void btnReset_Click(object sender, EventArgs e)
+        {
+            PageNumber = 1;
+            Licenses.Clear();
+            lb_logs.Clear();
+            TotalPages = 0;
+        }
+
+        private void tbSave_Click(object sender, EventArgs e)
+        {
+            //STEP 2: Fetch details
+            LogMessage("\n");
+            LogMessage("\n Fetch license details: ");
+
+            FetchLicenseDetails(tbLastName.Text, Licenses);
+
+            //STEP 3: Save to file
+            LogMessage("\n");
+            LogMessage($"\n Save to file - {lb_filePath.Text}");
+
+            var filteredRows = Licenses.Where(l => l.Licenses.Any(ll => ll.Status.Equals("Active", StringComparison.CurrentCultureIgnoreCase)))
+                                                   .ToList();
+            SaveToCsv(lb_filePath.Text, tbLastName.Text, filteredRows);
+
+            LogMessage("\n-----------------------------");
+            LogMessage("\nDONE!");
+            LogMessage("\n-----------------------------");
         }
     }
 }

@@ -41,6 +41,14 @@
             this.tbCaptcha = new System.Windows.Forms.TextBox();
             this.btnSubmitCaptcha = new System.Windows.Forms.Button();
             this.backgroundWorker1 = new System.ComponentModel.BackgroundWorker();
+            this.lbFromPage = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.lbTotalPages = new System.Windows.Forms.Label();
+            this.btnReset = new System.Windows.Forms.Button();
+            this.label4 = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
+            this.lbRecordsFound = new System.Windows.Forms.Label();
+            this.tbSave = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pbCaptcha)).BeginInit();
             this.SuspendLayout();
             // 
@@ -148,11 +156,90 @@
             this.btnSubmitCaptcha.UseVisualStyleBackColor = true;
             this.btnSubmitCaptcha.Click += new System.EventHandler(this.btnSubmitCaptcha_Click);
             // 
+            // lbFromPage
+            // 
+            this.lbFromPage.AutoSize = true;
+            this.lbFromPage.Location = new System.Drawing.Point(106, 86);
+            this.lbFromPage.Name = "lbFromPage";
+            this.lbFromPage.Size = new System.Drawing.Size(0, 13);
+            this.lbFromPage.TabIndex = 17;
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(147, 86);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(16, 13);
+            this.label5.TabIndex = 18;
+            this.label5.Text = "of";
+            // 
+            // lbTotalPages
+            // 
+            this.lbTotalPages.AutoSize = true;
+            this.lbTotalPages.Location = new System.Drawing.Point(188, 86);
+            this.lbTotalPages.Name = "lbTotalPages";
+            this.lbTotalPages.Size = new System.Drawing.Size(0, 13);
+            this.lbTotalPages.TabIndex = 19;
+            // 
+            // btnReset
+            // 
+            this.btnReset.Location = new System.Drawing.Point(205, 102);
+            this.btnReset.Name = "btnReset";
+            this.btnReset.Size = new System.Drawing.Size(52, 23);
+            this.btnReset.TabIndex = 21;
+            this.btnReset.Text = "Reset";
+            this.btnReset.UseVisualStyleBackColor = true;
+            this.btnReset.Click += new System.EventHandler(this.btnReset_Click);
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(12, 86);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(35, 13);
+            this.label4.TabIndex = 22;
+            this.label4.Text = "Page:";
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(12, 107);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(64, 13);
+            this.label6.TabIndex = 23;
+            this.label6.Text = "Total found:";
+            // 
+            // lbRecordsFound
+            // 
+            this.lbRecordsFound.AutoSize = true;
+            this.lbRecordsFound.Location = new System.Drawing.Point(106, 107);
+            this.lbRecordsFound.Name = "lbRecordsFound";
+            this.lbRecordsFound.Size = new System.Drawing.Size(0, 13);
+            this.lbRecordsFound.TabIndex = 24;
+            // 
+            // tbSave
+            // 
+            this.tbSave.Location = new System.Drawing.Point(205, 130);
+            this.tbSave.Name = "tbSave";
+            this.tbSave.Size = new System.Drawing.Size(52, 23);
+            this.tbSave.TabIndex = 25;
+            this.tbSave.Text = "Save found records to file";
+            this.tbSave.UseVisualStyleBackColor = true;
+            this.tbSave.Click += new System.EventHandler(this.tbSave_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(446, 504);
+            this.Controls.Add(this.tbSave);
+            this.Controls.Add(this.lbRecordsFound);
+            this.Controls.Add(this.label6);
+            this.Controls.Add(this.label4);
+            this.Controls.Add(this.btnReset);
+            this.Controls.Add(this.lbTotalPages);
+            this.Controls.Add(this.label5);
+            this.Controls.Add(this.lbFromPage);
             this.Controls.Add(this.btnSubmitCaptcha);
             this.Controls.Add(this.tbCaptcha);
             this.Controls.Add(this.pbCaptcha);
@@ -188,6 +275,14 @@
         private System.Windows.Forms.TextBox tbCaptcha;
         private System.Windows.Forms.Button btnSubmitCaptcha;
         private System.ComponentModel.BackgroundWorker backgroundWorker1;
+        private System.Windows.Forms.Label lbFromPage;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Label lbTotalPages;
+        private System.Windows.Forms.Button btnReset;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.Label lbRecordsFound;
+        private System.Windows.Forms.Button tbSave;
     }
 }
 
