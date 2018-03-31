@@ -16,6 +16,7 @@ namespace CNA_Scraper
 {
     class Program
     {
+        public static List<string> States = new List<string>();
         public static string OutputFilePath { get; set; }
         public static Dictionary<string, string> Data = new Dictionary<string, string>()
         {
@@ -36,7 +37,7 @@ namespace CNA_Scraper
         protected static CookieContainer Cookies = new CookieContainer();
         protected static RestClient Client = CreateRestClient();
 
-        private const int RETRY_ATTEMPTS = 7;
+        private const int RETRY_ATTEMPTS = 20;
         private const string BASE_URL = "https://www.cna.com/";
         private const string SEARCH_PAGE_URL = "https://www.cna.com/web/guest/cna/findanagent/!ut/p/b1/jc7JDoJADAbgZ_EJpsCgcBzRhB2RGYS5kNEYBdkkaAhPL3rx5NJDkybf3xZxlCBei3t-En3e1KJ8znyeYXAc6mImL31LAhIEU_NV8ObSBNLPgEXSf3n4UAR-5XeIfyOvD17gywnfbKojSie2eO-xZUkHEq6osVTMiSmIogRwFhXQelSDTjuUG5qPtqu47rjuB2os7NHLaKGF51Ufbav4Fl7U6rA7OvtadUQz6JyVkbi2escEtogxBNuYzFBbsQQKLB4KZDvm/";
         private const string AJAX_GET_RESULTS_URL = "https://www.cna.com/web/guest/cna/findanagent/!ut/p/b1/jY_NboMwEISfJU9gEyCBo5NUSsBAABN-Lsi1LAIFTImJEE9fyiWn0O5hpZG-2ZkFGUhA1tJnWVBZipbWvzrb5Rq0bYK1aHtwLwpEnjcvV4fOTpmB9D0Qhcr__PDNIPiXPwbZGrI0WICVCPcsGg7SGdu_7lhbxYTIP5HjQT3PmAoISKCWhxXsHGLA3mD1lZSThVWMpw85kuPempycVIZ_P8kwaG6D_6U3LOb2Z6vbVIxmFtUh_e7MPqLaBR1HL7ihzfxCuh4c9_whhp5xEBRcooK3EgtGpegD_hhqeaUFBz6j7M4xf_J60V0TJbDSaO6gzQ_qVMLh/";
@@ -44,50 +45,64 @@ namespace CNA_Scraper
         static Program()
         {
             //Needed to establish secure conneciton..
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-            Data["almState"] = ConfigurationManager.AppSettings["State"];
+            States = ConfigurationManager.AppSettings["States"].Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries).ToList();
             OutputFilePath = ConfigurationManager.AppSettings["OutputFilePath"];
         }
 
         static void Main(string[] args)
         {
-            Console.WriteLine($"STEP 1. Init search");
-            var searchResult = Init();
+            var allAgents = new List<Agent>();
 
-            Console.WriteLine($"\t {(searchResult.IsSuccess ? "'Success!'" : "'Failed!'")}. Found {searchResult.PageCount} pages");
-
-            #region Retry Logic 
-            if (!searchResult.IsSuccess)
+            foreach (var state in States)
             {
-                searchResult = RetrySearch();
+                Data["almState"] = state;
+                Data["almCurrentPageH"] = "1";
+                Data["almPageCacheMinH"] = "0";
+                Data["almPageCacheMaxH"] = "50";
 
-                //check success after retries..
+                Console.WriteLine($"STEP 1. Search agents in state - '{state}'");
+                var searchResult = Init();
+
+                Console.WriteLine($"\t {(searchResult.IsSuccess ? "'Success!'" : "'Failed!'")}. Found {searchResult.PageCount} pages");
+
+                #region Retry Logic 
                 if (!searchResult.IsSuccess)
                 {
-                    Console.WriteLine($"\t Something went wrong... {RETRY_ATTEMPTS} attempts were failed..");
+                    searchResult = RetrySearch();
+
+                    //check success after retries..
+                    if (!searchResult.IsSuccess)
+                    {
+                        Console.WriteLine($"\t Something went wrong... {RETRY_ATTEMPTS} attempts were failed..");
+                        Console.ReadLine();
+                        return;
+                    }
+                }
+                #endregion
+
+                //This will not possible if we are searching only by States, but let it be
+                if (searchResult.PageCount == 0)
+                {
+                    Console.WriteLine($"\t No Agents found...");
                     Console.ReadLine();
                     return;
                 }
-            }
-            #endregion
 
-            //This will not possible if we are searching only by States, but let it be
-            if (searchResult.PageCount == 0)
-            {
-                Console.WriteLine($"\t No Agents found...");
-                Console.ReadLine();
-                return;
-            }
+                Console.WriteLine("STEP 2. Loop through pages...");
+                var agents = ScrapAllPages(searchResult);
+                allAgents.AddRange(agents);
 
-            Console.WriteLine("STEP 2. Loop through pages...");
-            var agents = ScrapAllPages(searchResult);
+                Console.WriteLine(Environment.NewLine);
+                Console.WriteLine("------------------------------");
+            }
 
             Console.WriteLine("STEP 3. Save to file...");
             OutputFilePath = OutputFilePath.EndsWith(@"\") ? OutputFilePath : $@"{OutputFilePath}\";
-            SaveToFile($@"{OutputFilePath}{Data["almState"]}.xlsx", agents);
+            SaveToFile($@"{OutputFilePath}Agents_{DateTime.Now:MM-dd HH-mm}.xlsx", allAgents);
 
-            Console.WriteLine($"File was saved! {agents.Count} agents were scraped");
+            Console.WriteLine($"File was saved! {allAgents.Count} agents were scraped");
 
             Console.ReadLine();
         }
@@ -199,7 +214,35 @@ namespace CNA_Scraper
                 Thread.Sleep(waitTimeInSeconds * 1000);
             }
 
-            return new SearchResultContext() {IsSuccess = false};
+            return new SearchResultContext() { IsSuccess = false };
+        }
+
+        private static bool RetrySearchPage(int i, List<Agent> agents)
+        {
+            Console.WriteLine($"\t\tPage - {i}. Scrap failed... Retry...'");
+            var retryResult = RetrySearch();
+
+            if (!retryResult.IsSuccess)
+            {
+                Console.WriteLine($"\t\t Something went wrong... Page - {i} was not scrapped... go to next page'");
+                return false;
+            }
+
+            var j = 0;
+            while (j < RETRY_ATTEMPTS)
+            {
+                j++;
+                if (ParsePage(agents, retryResult.Document))
+                {
+                    return true;
+                }
+                else
+                {
+                    retryResult = RetrySearch();
+                }
+            }
+
+            return false;
         }
 
         private static List<Agent> ScrapAllPages(SearchResultContext searchResult)
@@ -208,7 +251,10 @@ namespace CNA_Scraper
 
             //Scrap current page
             Console.WriteLine("\t Page 1: ");
-            ParsePage(agents, searchResult.Document);
+            if (!ParsePage(agents, searchResult.Document))
+            {
+                RetrySearchPage(1, agents);
+            }
 
             //Loop through other pages
             for (var i = 2; i <= searchResult.PageCount; i++)
@@ -231,16 +277,11 @@ namespace CNA_Scraper
 
                 if (!success)
                 {
-                    Console.WriteLine($"\t\tPage - {i}. Scrap failed... Retry...'");
-                    var retryResult = RetrySearch();
-
-                    if (!retryResult.IsSuccess)
+                    if (!RetrySearchPage(i, agents))
                     {
-                        Console.WriteLine($"\t\t Something went wrong... Page - {i} was not scrapped... go to next page'");
-                        continue;;
+                        //Scrap page failed...
+                        continue;
                     }
-
-                    ParsePage(agents, retryResult.Document);
                 }
 
                 var rand = new Random();
