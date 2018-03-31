@@ -71,15 +71,29 @@ namespace OK_RealState
                     LogMessage($"\n Found {root.SelectNodes("//tr[contains(@class,'FormtableData')]")?.Count ?? 0} licences!");
 
                     var rows = root.SelectNodes("//tr[contains(@class,'FormtableData')]")?
-                                   .Select(row => new PersonLicense()
-                                   {
-                                       LicenseNumber = row.SelectSingleNode(".//td[1]//a")?.InnerText,
-                                       Name = row.SelectSingleNode(".//td[2]")?.InnerText.CleanupString() ?? row.SelectSingleNode("..//td[2]//a")?.InnerText.CleanupString(),
-                                       Address = row.SelectSingleNode(".//td[6]")?.InnerText.CleanupString(),
-                                       City = row.SelectSingleNode(".//td[7]")?.InnerText.CleanupString(),
-                                       State = row.SelectSingleNode(".//td[8]")?.InnerText.CleanupString(),
-                                       ZipCode = row.SelectSingleNode(".//td[9]")?.InnerText.CleanupString(),
-                                   })
+                                   .Select(row =>
+                                           {
+                                               var license = new PersonLicense
+                                               {
+                                                   LicenseNumber = row.SelectSingleNode(".//td[1]//a")?.InnerText,
+                                                   Name =
+                                                       row.SelectSingleNode(".//td[2]")?.InnerText.CleanupString() ??
+                                                       row.SelectSingleNode("..//td[2]//a")?.InnerText.CleanupString(),
+                                                   Address = row.SelectSingleNode(".//td[6]")?.InnerText.CleanupString(),
+                                                   City = row.SelectSingleNode(".//td[7]")?.InnerText.CleanupString(),
+                                                   State = row.SelectSingleNode(".//td[8]")?.InnerText.CleanupString(),
+                                                   ZipCode = row.SelectSingleNode(".//td[9]")?.InnerText.CleanupString()
+                                               };
+
+                                               license.FirstName = license.Name.Split(' ').Any()
+                                                   ? license.Name.Split(' ')[0]
+                                                   : license.Name;
+                                               license.LastName = license.Name.Split(' ').Count() > 1
+                                                   ? license.Name.Replace($"{license.Name.Split(' ')[0]} ", string.Empty)
+                                                   : string.Empty;
+
+                                               return license;
+                                           })
                                    .ToList();
 
 
@@ -153,12 +167,12 @@ namespace OK_RealState
 
             using (var stream = File.CreateText(fullPath))
             {
-                const string columnsLine = "licenseNumber,name,city,state,zip,address";
+                const string columnsLine = "licenseNumber,firstName,lastName,city,state,zip,address";
                 stream.WriteLine(columnsLine);
 
                 foreach (var l in personLicenses)
                 {
-                    stream.WriteLine($"{l.LicenseNumber},{l.Name},{l.City},{l.State},{l.ZipCode},{l.Address}");
+                    stream.WriteLine($"{l.LicenseNumber},{l.FirstName},{l.LastName},{l.City},{l.State},{l.ZipCode},{l.Address}");
                 }
             }
         }
