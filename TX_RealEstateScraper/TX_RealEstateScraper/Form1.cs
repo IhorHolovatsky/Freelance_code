@@ -235,8 +235,8 @@ namespace WebInsurance_Scraper
 
             var dataAria = root.SelectSingleNode("//div[@aria-data]")?.Attributes?["aria-data"]?.Value.Split('-')?[0];
 
-            license.Phone = Regex.Replace(root.SelectSingleNode($"//div[@id='{dataAria}-1']").InnerHtml, removeHtmlTagsRegex, string.Empty);
-            license.Email = Regex.Replace(root.SelectSingleNode($"//div[@id='{dataAria}-0']").InnerHtml, removeHtmlTagsRegex, string.Empty);
+            license.Phone = Regex.Replace(root.SelectSingleNode($"//div[@id='{dataAria}-1']")?.InnerHtml ?? string.Empty, removeHtmlTagsRegex, string.Empty);
+            license.Email = Regex.Replace(root.SelectSingleNode($"//div[@id='{dataAria}-0']")?.InnerHtml ?? string.Empty, removeHtmlTagsRegex, string.Empty);
         
             LogMessage($"\n\t License: {license.LicenseNumber}" +
                        $"\n\t Name: {license.FullName}" +

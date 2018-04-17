@@ -189,8 +189,8 @@ namespace NY_InsuranceScraper
             if (TotalPages == 0)
             {
                 var totalRecords = results.SelectSingleNode("//input[@id='totalRecords']")?.Attributes["value"].Value;
-                TotalPages = int.Parse(totalRecords) / 10;
-                if (int.Parse(totalRecords) % 10 != 0)
+                TotalPages = int.Parse(totalRecords ?? "0") / 10;
+                if (int.Parse(totalRecords ?? "0") % 10 != 0)
                 {
                     TotalPages++;
                 }
